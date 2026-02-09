@@ -1,0 +1,38 @@
+{
+  "name": "kafka-worker-service",
+  "version": "1.0.0",
+  "description": "High-performance Kafka worker with KIP-932/Batch support",
+  "main": "index.js",
+  "scripts": {
+    "// --- Infrastructure Management ---": "",
+    "infra:up": "docker-compose up -d",
+    "infra:down": "docker-compose down",
+    "infra:restart": "docker-compose down && docker-compose up -d",
+    "infra:clean": "docker-compose down -v && docker-compose up -d",
+    "infra:logs": "docker-compose logs -f broker",
+    "// --- Local Development ---": "",
+    "worker:dev": "node --watch worker.js",
+    "producer:dev": "node --watch producer.js",
+    "start:all": "concurrently \"npm run worker:dev\" \"npm run producer:dev\"",
+    "// --- Maintenance ---": "",
+    "kafka:topics": "docker exec broker kafka-topics --list --bootstrap-server localhost:9092",
+    "kafka:describe": "docker exec broker kafka-topics --describe --topic file-upload-queue --bootstrap-server localhost:9092",
+    "kafka:purge": "docker exec broker kafka-topics --delete --topic file-upload-queue --bootstrap-server localhost:9092 || true",
+    "// --- Senior Production Helpers ---": "",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "eslint": "^8.56.0"
+  },
+  "dependencies": {
+    "axios": "^1.13.4",
+    "express": "^5.2.1",
+    "kafkajs": "^2.2.4",
+    "multer": "^2.0.2",
+    "p-limit": "^7.3.0",
+    "pg": "^8.18.0",
+    "uuid": "^13.0.0"
+  }
+}
