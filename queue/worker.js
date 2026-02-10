@@ -1,14 +1,14 @@
-const fs = require('fs');
-const path = require('path');
-const express = require('express');
-const { Kafka } = require('kafkajs');
-const pLimit = require('p-limit').default;
-const db = require('../db');
+const fs = require("fs");
+const path = require("path");
+const express = require("express");
+const { Kafka } = require("kafkajs");
+const pLimit = require("p-limit").default;
+const db = require("../db");
 
 const MONITOR_PORT = 3002;
 const app = express();
 
-/* ============================================================
+/* -------/* ============================================================
    CONFIG
 ============================================================ */
 const MAX_COMPLETED_LOGS = 5;
@@ -28,7 +28,7 @@ let limit = pLimit(getLimitValue());
    SCHEDULER STATE (FOR LOGGING ONLY)
 ============================================================ */
 const schedulerState = {
-  running: new Map(),   // slotNumber -> { jobId, duration }
+  running: new Map(), // slotNumber -> { jobId, duration }
   waiting: [],
   completed: [],
 };
@@ -46,12 +46,12 @@ function getSlotSnapshot() {
       const job = schedulerState.running.get(i);
       slots.push({
         slot: `Slot ${i}`,
-        status: `${job.jobId} (RUNNING – ${job.duration}s)`
+        status: `${job.jobId} (RUNNING – ${job.duration}s)`,
       });
     } else {
       slots.push({
         slot: `Slot ${i}`,
-        status: 'FREE'
+        status: "FREE",
       });
     }
   }
@@ -70,7 +70,7 @@ function getSlotSnapshot() {
 function printSchedulerTable(reason) {
   const snapshot = getSlotSnapshot();
 
-  console.log('\n```md');
+  console.log("\n```md");
   console.log(`### Scheduler Update → ${reason}\n`);
 
   console.log(`| Metric | Value |`);
@@ -81,90 +81,191 @@ function printSchedulerTable(reason) {
 
   console.log(`\n| Slot | Status |`);
   console.log(`|------|--------|`);
-  snapshot.slots.forEach(s => {
+  snapshot.slots.forEach((s) => {
     console.log(`| ${s.slot} | ${s.status} |`);
   });
 
   console.log(`\n| Waiting Queue |`);
   console.log(`|---------------|`);
-  console.log(`| ${schedulerState.waiting.join(', ') || '—'} |`);
+  console.log(`| ${schedulerState.waiting.join(", ") || "—"} |`);
 
   console.log(`\n| Completed (latest) |`);
   console.log(`|--------------------|`);
   console.log(
-    `| ${schedulerState.completed.slice(-MAX_COMPLETED_LOGS).join(', ') || '—'} |`
+    `| ${schedulerState.completed.slice(-MAX_COMPLETED_LOGS).join(", ") || "—"} |`,
   );
 
-  console.log('```\n');
+  console.log("```\n");
 }
 
 /* ============================================================
    KAFKA CONSUMER
 ============================================================ */
 const kafka = new Kafka({
-  clientId: 'file-worker',
-  brokers: ['localhost:9092'],
+  clientId: "file-worker",
+  brokers: ["localhost:9092"],
   retry: { retries: 10 }, //If Kafka broker is temporarily unavailable → it retries 10 times.
 });
 
 const consumer = kafka.consumer({
-  groupId: 'file-upload-workers',
+  groupId: "file-upload-workers",
 });
 
 /* ============================================================
    JOB PROCESSOR
 ============================================================ */
+// async function processFile(job) {
+
+//   console.log("\n\n\--------------------------------------------------------------------------------------------------------\n\njob:",JSON.stringify(job,null,2),
+//   "\n\n--------------------------------------------------------------------------------------------------------\n\n")
+//   try {
+//     await db.query(
+//       `UPDATE jobs
+//        SET status='PROCESSING', started_at=NOW()
+//        WHERE job_id=$1`,
+//       [job.jobId]
+//     );
+
+//     const duration = Number(job.processingTime || 60000);
+//     await new Promise(r => setTimeout(r, duration));
+
+//     const { rows } = await db.query(
+//       `SELECT uuid, file_name
+//        FROM uploads
+//        WHERE job_id=$1`,
+//       [job.jobId]
+//     );
+
+//     if (!rows.length) throw new Error('No attachment found');
+
+//     const attachment = rows[0];
+//     const storageDir = path.join(__dirname, 'storage');
+//     if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+
+//     const filePath = path.join(
+//       storageDir,
+//       `${job.jobId}-${attachment.file_name}`
+//     );
+
+//     fs.writeFileSync(filePath, Buffer.from(job.buffer, 'base64'));
+
+//     await db.query(
+//       `UPDATE uploads
+//        SET file_location=$2
+//        WHERE attachment_id=$1`,
+//       [attachment.attachment_id, filePath]
+//     );
+
+//     await db.query(
+//       `UPDATE jobs
+//        SET status='COMPLETED', completed_at=NOW()
+//        WHERE job_id=$1`,
+//       [job.jobId]
+//     );
+//   } catch (err) {
+//     await db.query(
+//       `UPDATE jobs
+//        SET status='FAILED', error_message=$2
+//        WHERE job_id=$1`,
+//       [job.jobId, err.message]
+//     );
+//   }
+// }
+
 async function processFile(job) {
+  // console.log(
+  //   "\n\n-------------------------------- JOB RECEIVED --------------------------------\n\n",
+  //   JSON.stringify(job, null, 2),
+  //   "\n\n-------------------------------------------------------------------------------\n\n",
+  // );
+
   try {
+    /* --------------------------------------------------
+       Mark job PROCESSING
+    -------------------------------------------------- */
     await db.query(
       `UPDATE jobs
-       SET status='PROCESSING', started_at=NOW()
-       WHERE job_id=$1`,
-      [job.jobId]
+       SET status = 'PROCESSING', started_at = NOW()
+       WHERE id = $1`,
+      [job.jobId],
     );
 
-    const duration = Number(job.processingTime || 60000);
-    await new Promise(r => setTimeout(r, duration));
+    /* --------------------------------------------------
+       Simulated processing time
+    -------------------------------------------------- */
+    // const duration = Number(job.processingTime || 60000);
+    // await new Promise((r) => setTimeout(r, duration));
 
+    /* --------------------------------------------------
+       Fetch upload record
+    -------------------------------------------------- */
     const { rows } = await db.query(
-      `SELECT attachment_id, file_name
-       FROM attachments
-       WHERE job_id=$1`,
-      [job.jobId]
+      `SELECT uuid, file_name
+       FROM uploads
+       WHERE job_id = $1`,
+      [job.jobId],
     );
 
-    if (!rows.length) throw new Error('No attachment found');
+    if (!rows.length) {
+      throw new Error(`No upload found for job_id ${job.jobId}`);
+    }
 
-    const attachment = rows[0];
-    const storageDir = path.join(__dirname, 'storage');
-    if (!fs.existsSync(storageDir)) fs.mkdirSync(storageDir, { recursive: true });
+    const upload = rows[0];
 
-    const filePath = path.join(
-      storageDir,
-      `${job.jobId}-${attachment.file_name}`
-    );
+    /* --------------------------------------------------
+   Write file to disk (preserve extension)
+-------------------------------------------------- */
+    const storageDir = path.join(__dirname, "storage");
+    if (!fs.existsSync(storageDir)) {
+      fs.mkdirSync(storageDir, { recursive: true });
+    }
 
-    fs.writeFileSync(filePath, Buffer.from(job.buffer, 'base64'));
+    const originalName = job.file.fileName; // from producer
+    const ext = path.extname(originalName); // ".pdf", ".xlsx", ".png"
+    const baseName = upload.file_name || path.basename(originalName, ext);
 
+    const filePath = path.join(storageDir, `${job.jobId}-${baseName}${ext}`);
+
+    fs.writeFileSync(filePath, Buffer.from(job.file.buffer, "base64"));
+
+    /* --------------------------------------------------
+       Update upload record
+    -------------------------------------------------- */
     await db.query(
-      `UPDATE attachments
-       SET storage_path=$2
-       WHERE attachment_id=$1`,
-      [attachment.attachment_id, filePath]
+      `UPDATE uploads
+       SET file_location = $2,
+           status = 'COMPLETED',
+           modified_on = NOW()
+       WHERE uuid = $1`,
+      [upload.uuid, filePath],
     );
 
+    /* --------------------------------------------------
+       Mark job COMPLETED
+    -------------------------------------------------- */
     await db.query(
       `UPDATE jobs
-       SET status='COMPLETED', completed_at=NOW()
-       WHERE job_id=$1`,
-      [job.jobId]
+       SET status = 'COMPLETED', completed_at = NOW()
+       WHERE id = $1`,
+      [job.jobId],
     );
+
+    console.log(`✅ Job ${job.jobId} completed successfully`);
   } catch (err) {
+    console.error(`❌ Job ${job.jobId} failed`, err);
+
     await db.query(
       `UPDATE jobs
-       SET status='FAILED', error_message=$2
-       WHERE job_id=$1`,
-      [job.jobId, err.message]
+       SET status = 'FAILED', error_message = $2
+       WHERE id = $1`,
+      [job.jobId, err.message],
+    );
+
+    await db.query(
+      `UPDATE uploads
+       SET status = 'FAILED', modified_on = NOW()
+       WHERE job_id = $1`,
+      [job.jobId],
     );
   }
 }
@@ -175,7 +276,7 @@ async function processFile(job) {
 (async () => {
   await consumer.connect();
   await consumer.subscribe({
-    topic: 'file-upload-queue',
+    topic: "file-upload-queue",
     fromBeginning: false,
   });
 
@@ -190,10 +291,10 @@ async function processFile(job) {
 
       /* ---- Persist job ---- */
       await db.query(
-        `INSERT INTO jobs (job_id, status, created_at)
+        `INSERT INTO jobs (id, status, created_at)
          VALUES ($1, 'QUEUED', NOW())
-         ON CONFLICT (job_id) DO NOTHING`,
-        [job.jobId]
+         ON CONFLICT (id) DO NOTHING`,
+        [job.jobId],
       );
 
       /* ---- Kafka ACK ---- */
@@ -213,13 +314,13 @@ async function processFile(job) {
 
       limit(async () => {
         /* assign slot */
-        const slot =
-          [...Array(limit.concurrency).keys()]
-            .map(i => i + 1)
-            .find(i => !schedulerState.running.has(i));
+        const slot = [...Array(limit.concurrency).keys()]
+          .map((i) => i + 1)
+          .find((i) => !schedulerState.running.has(i));
 
-        schedulerState.waiting =
-          schedulerState.waiting.filter(j => j !== job.jobId);
+        schedulerState.waiting = schedulerState.waiting.filter(
+          (j) => j !== job.jobId,
+        );
 
         schedulerState.running.set(slot, {
           jobId: job.jobId,
