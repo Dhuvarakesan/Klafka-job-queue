@@ -70,8 +70,19 @@ function getSlotSnapshot() {
 function printSchedulerTable(reason) {
   const snapshot = getSlotSnapshot();
 
+  const now = new Date();
+
+  const isoTime = now.toISOString(); // 2026-02-10T08:45:12.345Z
+  const localTime = now.toLocaleString("en-IN", {
+    hour12: false,
+  }); // 10/02/2026, 14:15:12
+
   console.log("\n```md");
-  console.log(`### Scheduler Update → ${reason}\n`);
+  console.log(
+    `### Scheduler Update → ${reason}\n\n` +
+    // `**Timestamp (ISO):** ${isoTime}\n` +
+    `**Timestamp :** ${localTime}\n`
+  );
 
   console.log(`| Metric | Value |`);
   console.log(`|-------|-------|`);
@@ -92,11 +103,12 @@ function printSchedulerTable(reason) {
   console.log(`\n| Completed (latest) |`);
   console.log(`|--------------------|`);
   console.log(
-    `| ${schedulerState.completed.slice(-MAX_COMPLETED_LOGS).join(", ") || "—"} |`,
+    `| ${schedulerState.completed.slice(-MAX_COMPLETED_LOGS).join(", ") || "—"} |`
   );
 
   console.log("```\n");
 }
+
 
 /* ============================================================
    KAFKA CONSUMER
@@ -180,6 +192,8 @@ async function processFile(job) {
   // );
 
   try {
+
+    
     /* --------------------------------------------------
        Mark job PROCESSING
     -------------------------------------------------- */
@@ -193,8 +207,8 @@ async function processFile(job) {
     /* --------------------------------------------------
        Simulated processing time
     -------------------------------------------------- */
-    // const duration = Number(job.processingTime || 60000);
-    // await new Promise((r) => setTimeout(r, duration));
+    const duration = Number(job.processingTime || 60000);
+    await new Promise((r) => setTimeout(r, duration));
 
     /* --------------------------------------------------
        Fetch upload record
@@ -251,6 +265,7 @@ async function processFile(job) {
     );
 
     console.log(`✅ Job ${job.jobId} completed successfully`);
+  return { success: true };
   } catch (err) {
     console.error(`❌ Job ${job.jobId} failed`, err);
 
@@ -267,6 +282,7 @@ async function processFile(job) {
        WHERE job_id = $1`,
       [job.jobId],
     );
+     return { success: false, error: err.message };
   }
 }
 
@@ -298,13 +314,13 @@ async function processFile(job) {
       );
 
       /* ---- Kafka ACK ---- */
-      await consumer.commitOffsets([
-        {
-          topic,
-          partition,
-          offset: (Number(message.offset) + 1).toString(),
-        },
-      ]);
+      // await consumer.commitOffsets([
+      //   {
+      //     topic,
+      //     partition,
+      //     offset: (Number(message.offset) + 1).toString(),
+      //   },
+      // ]);
 
       /* ---- Scheduler queue ---- */
       schedulerState.waiting.push(job.jobId);
@@ -329,7 +345,30 @@ async function processFile(job) {
 
         printSchedulerTable(`Slot ${slot} allocated to ${job.jobId}`);
 
-        await processFile(job);
+        // await processFile(job);
+
+        const result = await processFile(job);
+
+      if (result.success) {
+        /* ---- Kafka ACK AFTER SUCCESS ---- */
+        await consumer.commitOffsets([
+        {
+          topic,
+          partition,
+          offset: (Number(message.offset) + 1).toString(),
+        },
+      ]);
+
+        console.log(`✅ Offset committed for ${job.jobId}`);
+
+        schedulerState.completed.push(job.jobId);
+        printSchedulerTable(`Job ${job.jobId} completed`);
+      } else {
+        console.error(`❌ Job ${job.jobId} failed`, result.error);
+        throw new Error(result.error); // let Kafka retry
+      }  
+
+
 
         schedulerState.running.delete(slot);
         schedulerState.completed.push(job.jobId);

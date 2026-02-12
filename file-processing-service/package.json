@@ -1,0 +1,38 @@
+{
+  "name": "file-processing-service",
+  "version": "1.0.0",
+  "description": "Kafka-based file processing worker service",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "lint": "echo \"Add ESLint if needed\"",
+    "test": "echo \"Add tests\""
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "form-data": "^4.0.0",
+    "kafkajs": "^2.2.4",
+    "pg": "^8.11.5",
+    "p-limit": "^4.0.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "kafka",
+    "worker",
+    "file-processing",
+    "microservice",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "MIT"
+}
