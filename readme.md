@@ -145,3 +145,159 @@ const run = async () => {
 | **`idempotent`** | `false` | `true` | Prevents duplicate files if the network retries a send. |
 | **`sessionTimeout`** | `30000` (30s) | `120000` (120s) | Allows 60s jobs to finish without Kafka "panicking". |
 | **`compression`** | None | `GZIP` | Saves 30-50% on cloud network costs (egress fees). |
+
+
+env 
+
+# ----------------------------------
+# APPLICATION
+# ----------------------------------
+
+# Possible values:
+# development | production | staging | test
+NODE_ENV=development
+
+# Server port number (any valid integer port)
+PORT=3003
+
+
+# ----------------------------------
+# KAFKA
+# ----------------------------------
+
+# Any string (used to identify this service in Kafka)
+KAFKA_CLIENT_ID=file-processing-service
+
+# Comma-separated broker list
+# Example:
+# localhost:9092
+# kafka1:9092,kafka2:9092
+KAFKA_BROKERS=localhost:9092
+
+# Topic name (must match Kafka topic)
+KAFKA_TOPIC=file-upload-queue
+
+# Consumer group ID (same group → load balancing, different group → duplicate consumption)
+KAFKA_GROUP_ID=file-processing-group
+
+# ----------------------------------
+# KAFKA CONSUMER TIMING CONFIG
+# ----------------------------------
+
+# SESSION TIMEOUT (milliseconds)
+# How long Kafka waits before declaring this consumer DEAD.
+#
+# If processing takes long time (e.g., 5+ minutes),
+# increase this value.
+#
+# Examples:
+# 30000   = 30 seconds (default KafkaJS)
+# 300000  = 5 minutes
+# 600000  = 10 minutes
+#
+# IMPORTANT:
+# Must be GREATER than heartbeat interval.
+KAFKA_SESSION_TIMEOUT=600000
+
+
+# HEARTBEAT INTERVAL (milliseconds)
+# How often the consumer sends heartbeat to Kafka.
+#
+# IMPORTANT RULE:
+#   heartbeatInterval < sessionTimeout
+#
+# Recommended ratio:
+#   heartbeatInterval ≈ sessionTimeout / 3
+#
+# Common safe value:
+#   3000 (3 seconds)
+#
+# Keep this small to avoid accidental rebalances.
+KAFKA_HEARTBEAT_INTERVAL=3000
+
+
+# ----------------------------------
+# SCHEDULER / CONCURRENCY
+# ----------------------------------
+
+# Enable parallel execution?
+# true  → use pLimit concurrency
+# false → sequential processing (1 job at a time)
+PARALLEL_ENABLED=true
+
+# Max number of parallel jobs
+# Must be integer >= 1
+MAX_CONCURRENCY=5
+
+
+# ----------------------------------
+# EXTERNAL API
+# ----------------------------------
+
+# Python external API
+EXTERNAL_API_URL=https://externalapi:3222
+
+# Node upload server
+UPLOAD_SERVICE_URL=http://localhost:8502
+
+
+
+# Timeout in milliseconds
+# Recommended:
+# 5000  (5 sec)
+# 10000 (10 sec)
+# 30000 (30 sec)
+EXTERNAL_API_TIMEOUT=10000
+
+# true  → verify SSL (production)
+# false → disable SSL verification (dev only)
+EXTERNAL_API_REJECT_UNAUTHORIZED=false
+
+
+# ----------------------------------
+# DATABASE (PostgreSQL)
+# ----------------------------------
+
+# Database username
+DB_USER=sophiademodev
+
+# Database host
+# localhost (local dev)
+# db (Docker service name)
+# RDS endpoint (production)
+DB_HOST=20.xx.xx.xx
+
+# Database name
+DB_NAME=teamdev
+
+# Database password
+DB_PASSWORD=pass@2024
+
+# Database port (usually 5432)
+DB_PORT=5432
+
+# Optional SSL (true | false)
+DB_SSL=false
+
+
+# ----------------------------------
+# LOGGING
+# ----------------------------------
+
+# Possible values:
+# DEBUG → verbose
+# INFO  → normal
+# WARN  → warnings only
+# ERROR → only errors
+LOG_LEVEL=INFO
+
+# Where to log?
+# console → terminal logs
+# file    → write to file
+# both    → console + file
+LOG_OUTPUT=both
+
+# Directory where logs are stored (used if file or both)
+LOG_DIRECTORY=./logs
+
+
